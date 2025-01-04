@@ -1,11 +1,8 @@
 import axios from "axios";
 
-const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL;
-const privateKey = process.env.NEXT_PUBLIC_PRIVATE_KEY;
-
 export const baseAxios = axios.create({
-  baseURL: serverUrl,
+  baseURL: "https://staging.mazaady.com/api/v1",
   headers: {
-    "private-key": privateKey,
+    "private-key": "3%o8i}_;3D4bF]G5@22r2)Et1&mLJ4?$@+16",
   },
 });
