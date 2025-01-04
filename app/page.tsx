@@ -1,101 +1,191 @@
-import Image from "next/image";
+"use client";
+
+import { fetchCategories } from "@/api/fetchCategories";
+import { fetchProperties } from "@/api/fetchProperties";
+import { fetchPropertyChild } from "@/api/fetchPropertyChild";
+import Field from "@/components/Field";
+import CategorySelect from "@/components/page/CategorySelect";
+import SubCategorySelect from "@/components/page/SubCategorySelect";
+import { Category } from "@/types/category";
+import StyledReactSelect from "@/components/StyledReactSelect";
+import { Option, PropertyWithOptionIds } from "@/types/option";
+import { PropertyWithChildren } from "@/types/property";
+import { appendOtherInOptions } from "@/utils/appendOtherToOptions";
+import { flatMapProperties } from "@/utils/flatMapProperties";
+import { handleFetchChildProperty } from "@/utils/handleFetchChild";
+import { useState } from "react";
+import { Controller, useForm } from "react-hook-form";
+import { useQuery } from "react-query";
+import { SingleValue } from "react-select";
+import Modal from "@/components/Modal";
+import ResultsTable from "@/components/page/ResultsTable";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const {
+    register,
+    formState: { errors },
+    control,
+    setValue,
+    watch,
+    getValues,
+    trigger,
+    handleSubmit,
+  } = useForm();
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const category = watch("category");
+  const subCategory = watch("subCategory");
+
+  const [
+    tempSelectedPropertyWithChildOption,
+    setTempSelectedPropertyWithChildOption,
+  ] = useState<PropertyWithOptionIds | null>(null);
+  const [selectedProperties, setSelectedProperties] = useState<
+    PropertyWithChildren[]
+  >([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const { isLoading: propertiesLoading } = useQuery({
+    queryKey: ["properties", subCategory?.value.id],
+    queryFn: () => fetchProperties(subCategory?.value.id),
+    enabled: !!subCategory,
+    refetchOnWindowFocus: false,
+    onSuccess: (data) => {
+      setSelectedProperties(data);
+    },
+  });
+  useQuery({
+    queryKey: [
+      tempSelectedPropertyWithChildOption?.optionId,
+      tempSelectedPropertyWithChildOption?.propertyId,
+    ],
+    refetchOnWindowFocus: false,
+    queryFn: () =>
+      fetchPropertyChild(Number(tempSelectedPropertyWithChildOption?.optionId)),
+    enabled: !!tempSelectedPropertyWithChildOption,
+    onSuccess: (data) =>
+      handleFetchChildProperty({
+        data,
+        selectedProperties,
+        tempSelectedPropertyWithChildOption,
+        setSelectedProperties,
+        setValue,
+      }),
+  });
+  const allPropertiesData = flatMapProperties(selectedProperties);
+
+  const onSubmit = () => {
+    console.log("submit");
+    setIsModalOpen(true);
+  };
+
+  const onCloseModal = () => {
+    setIsModalOpen(false);
+  };
+
+  const { data: categories, isLoading: categoriesLoading } = useQuery({
+    queryKey: ["categories"],
+    queryFn: fetchCategories,
+    refetchOnWindowFocus: false,
+  });
+  const categoryOptions = categories?.categories?.map((category: Category) => ({
+    value: category,
+    label: category.name,
+  }));
+  if (categoriesLoading) return <div>Loading...</div>;
+
+  return (
+    <form className="flex flex-col gap-4" onSubmit={handleSubmit(onSubmit)}>
+      <CategorySelect
+        control={control}
+        errors={errors}
+        setValue={setValue}
+        categoryOptions={categoryOptions}
+        categoriesLoading={categoriesLoading}
+      />
+      <SubCategorySelect
+        control={control}
+        errors={errors}
+        category={category}
+      />
+      <Modal isOpen={isModalOpen} onClose={onCloseModal}>
+        <ResultsTable values={getValues()} />
+      </Modal>
+      {propertiesLoading ? (
+        <div>Loading...</div>
+      ) : subCategory ? (
+        <div className="flex flex-col gap-4">
+          {allPropertiesData?.map((property: PropertyWithChildren) => {
+            return (
+              <div key={property.id} className="flex flex-col gap-2">
+                <Field label={property.name}>
+                  <Controller
+                    control={control}
+                    name={property.name}
+                    render={({ field }) => (
+                      <StyledReactSelect
+                        isError={!!errors[property.name]}
+                        options={appendOtherInOptions(property.options).map(
+                          (option: Option) => ({
+                            value: option,
+                            label: option?.name,
+                          })
+                        )}
+                        {...field}
+                        onChange={(selectedOption) => {
+                          if (
+                            (
+                              selectedOption as SingleValue<{
+                                label: string;
+                                value: Option;
+                              }>
+                            )?.value?.child
+                          ) {
+                            // set the temp selected property with child option to trigger the query
+                            setTempSelectedPropertyWithChildOption({
+                              propertyId: property?.id,
+                              optionId: selectedOption?.value?.id,
+                            });
+                          }
+                          // trigger the field to rerender if the user select other
+                          trigger(property.name);
+                          field.onChange(selectedOption);
+                        }}
+                      />
+                    )}
+                  />
+                </Field>
+
+                {getValues(property.name)?.value?.id === "OTHER" && (
+                  <Field error={errors[`${property.name}-other`]}>
+                    <input
+                      type="text"
+                      placeholder="Enter other value"
+                      {...register(`${property.name}-other`, {
+                        required: {
+                          message: "Other value is required",
+                          value: true,
+                        },
+                      })}
+                      className={`border rounded-md p-2 shadow-none outline-none ${
+                        errors[`${property.name}-other`]
+                          ? "border-red-500"
+                          : "border-gray-300"
+                      }`}
+                    />
+                  </Field>
+                )}
+              </div>
+            );
+          })}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      ) : (
+        <div>Select a category and sub category</div>
+      )}
+      <button
+        onClick={onSubmit}
+        className="bg-blue-500 text-white p-2 rounded-md"
+      >
+        Submit
+      </button>
+    </form>
   );
 }
