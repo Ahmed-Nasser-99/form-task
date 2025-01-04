@@ -3,6 +3,7 @@ import Field from "../Field";
 import { Control, Controller, FieldErrors } from "react-hook-form";
 import StyledReactSelect from "../StyledReactSelect";
 import { Category } from "@/types/category";
+import { resetAllValuesExcept } from "@/utils/resetAllValuesExcept";
 
 interface CategorySelectProps {
   control: Control<any>;
@@ -13,6 +14,7 @@ interface CategorySelectProps {
     label: string;
   }[];
   categoriesLoading: boolean;
+  getValues: () => any;
 }
 
 const CategorySelect = ({
@@ -21,6 +23,7 @@ const CategorySelect = ({
   setValue,
   categoryOptions,
   categoriesLoading,
+  getValues,
 }: CategorySelectProps) => {
   return (
     <Field label="Category" error={errors.category}>
@@ -44,7 +47,11 @@ const CategorySelect = ({
             onChange={(selectedOption) => {
               field.onChange(selectedOption);
               // reset sub category on change the category
-              setValue("subCategory", null);
+              resetAllValuesExcept({
+                values: getValues(),
+                setValue,
+                except: ["category"],
+              });
             }}
           />
         )}

@@ -3,6 +3,7 @@ import Field from "../Field";
 import { Control, Controller, FieldErrors } from "react-hook-form";
 import StyledReactSelect from "../StyledReactSelect";
 import { Category } from "@/types/category";
+import { resetAllValuesExcept } from "@/utils/resetAllValuesExcept";
 
 interface SubCategorySelectProps {
   control: Control<any>;
@@ -11,12 +12,16 @@ interface SubCategorySelectProps {
     value: Category;
     label: string;
   };
+  setValue: (name: string, value: any) => void;
+  getValues: () => any;
 }
 
 const SubCategorySelect = ({
   control,
   errors,
   category,
+  setValue,
+  getValues,
 }: SubCategorySelectProps) => {
   const subCategoryOptions = category?.value?.children?.map(
     (subCategory: Category) => ({
@@ -42,6 +47,15 @@ const SubCategorySelect = ({
             isDisabled={!category}
             isError={!!errors.subCategory}
             {...field}
+            onChange={(selectedOption) => {
+              field.onChange(selectedOption);
+              // reset sub category on change the category
+              resetAllValuesExcept({
+                values: getValues(),
+                setValue,
+                except: ["subCategory", "category"],
+              });
+            }}
           />
         )}
       />

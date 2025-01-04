@@ -100,11 +100,14 @@ export default function Home() {
         setValue={setValue}
         categoryOptions={categoryOptions}
         categoriesLoading={categoriesLoading}
+        getValues={getValues}
       />
       <SubCategorySelect
         control={control}
         errors={errors}
         category={category}
+        setValue={setValue}
+        getValues={getValues}
       />
       <Modal isOpen={isModalOpen} onClose={onCloseModal}>
         <ResultsTable values={getValues()} />
